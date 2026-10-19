@@ -1,7 +1,7 @@
 //! This crate implements utilities for working with `fs-verity` functionality of the Linux kernel.
-//! 
+//!
 //! ## What is `fs-verity`?
-//! 
+//!
 //! This allows you to make a file permanently immutable and have the kernel calculate and store
 //! a Merkle tree hash for the file that will be instantly retrievable from that point on. The
 //! kernel will also refuse to load any part of the file into memory unless it matches the
@@ -17,7 +17,7 @@
 //! ## What is this crate?
 //!
 //! You can think of it as a pure Rust replacement for the main parts of `libfsverity`.
-//! 
+//!
 //! It consists of two parts:
 //!
 //! * An implementation of [`sha2::digest::Digest`] which can calculate an `fs-verity` measurement
@@ -42,7 +42,3 @@ pub use config::*;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
-
-mod digest;
-
-pub use digest::*;

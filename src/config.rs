@@ -1,5 +1,3 @@
-use num_enum::TryFromPrimitive;
-
 /// Maximum size of digests, as described [in the Linux kernel documentation](https://www.kernel.org/doc/html/latest/filesystems/fsverity.html#fs-verity-descriptor).
 pub const MAX_DIGEST_SIZE: usize = 64;
 
@@ -19,16 +17,10 @@ pub const DEFAULT_BLOCK_SIZE: usize = 4096;
 use super::*;
 
 /// Enum of the supported inner hash algorithms.
-/// 
+///
 /// The [`Default`] value is `Sha256`, corresponding to the default hash algorithm in the `fsverity` tools, and to the
 /// default generic parameter of [`FsVerityDigest`].
-/// 
-/// This enum supports conversion to string using [`std::fmt::Display`] and from a string using [`parse_display::FromStr`].
-/// 
-/// It also supports conversion to integer using `as u8` and from integer using [`TryFromPrimitive`]). These integers values
-/// match the hash algorithm numbering used in the fsverity kernel API.
-#[derive(Copy, Clone, PartialEq, Eq, parse_display::FromStr, parse_display::Display, Debug, TryFromPrimitive)]
-#[display(style = "lowercase")]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum InnerHashAlgorithm {
     /// As string: `sha256`. As number: `FS_VERITY_HASH_ALG_SHA256` from the kernel API.
@@ -43,3 +35,25 @@ impl Default for InnerHashAlgorithm {
         Self::Sha256
     }
 }
+
+impl std::convert::TryFrom<u8> for InnerHashAlgorithm {
+    type Error = UnknownHashAlgorithm;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(InnerHashAlgorithm::Sha256),
+            2 => Ok(InnerHashAlgorithm::Sha512),
+            _ => Err(UnknownHashAlgorithm(value)),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UnknownHashAlgorithm(u8);
+
+impl std::fmt::Display for UnknownHashAlgorithm {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "unexpected inner hash identifier {}", self.0)
+    }
+}
+
+impl std::error::Error for UnknownHashAlgorithm {}

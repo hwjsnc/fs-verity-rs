@@ -5,17 +5,18 @@
 //!
 //! <https://www.kernel.org/doc/html/latest/filesystems/fsverity.html#filesystem-support>
 
+use super::config;
 #[allow(non_camel_case_types)]
-
 use std::convert::TryFrom;
 use std::os::unix::prelude::AsRawFd;
-use super::config;
 
 // FIXME these are calculated through complex macros that bindgen doesn't like.
 //       it's also possible they are not the same on all architectures.
 //       should really check this!!!
 const FS_IOC_ENABLE_VERITY: u64 = 1082156677;
 const FS_IOC_MEASURE_VERITY: u64 = 3221513862;
+// confirmed to be correct on:
+// - amd64
 
 /// Enables `fs-verity` on the given file, with the given block size, hash algorithm, and salt.
 ///
@@ -23,7 +24,12 @@ const FS_IOC_MEASURE_VERITY: u64 = 3221513862;
 /// the meaning of error codes:
 ///
 /// <https://www.kernel.org/doc/html/latest/filesystems/fsverity.html#fs-ioc-enable-verity>
-pub fn fsverity_enable(fd: impl AsRawFd, block_size: usize, hash: config::InnerHashAlgorithm, salt: &[u8]) -> std::io::Result<()> {
+pub fn fsverity_enable(
+    fd: impl AsRawFd,
+    block_size: usize,
+    hash: config::InnerHashAlgorithm,
+    salt: &[u8],
+) -> std::io::Result<()> {
     let fd = fd.as_raw_fd();
     #[repr(C)]
     pub struct fsverity_enable_arg {
@@ -54,8 +60,7 @@ pub fn fsverity_enable(fd: impl AsRawFd, block_size: usize, hash: config::InnerH
 
     if ret < 0 {
         Err(std::io::Error::last_os_error())
-    }
-    else {
+    } else {
         Ok(())
     }
 }
@@ -66,7 +71,9 @@ pub fn fsverity_enable(fd: impl AsRawFd, block_size: usize, hash: config::InnerH
 /// the meaning of error codes:
 ///
 /// <https://www.kernel.org/doc/html/latest/filesystems/fsverity.html#fs-ioc-measure-verity>
-pub fn fsverity_measure(fd: impl AsRawFd) -> std::io::Result<(config::InnerHashAlgorithm, Box<[u8]>)> {
+pub fn fsverity_measure(
+    fd: impl AsRawFd,
+) -> std::io::Result<(config::InnerHashAlgorithm, Box<[u8]>)> {
     let fd = fd.as_raw_fd();
     #[repr(C)]
     struct fsverity_digest {
@@ -76,7 +83,7 @@ pub fn fsverity_measure(fd: impl AsRawFd) -> std::io::Result<(config::InnerHashA
     }
 
     let mut digest = fsverity_digest {
-        digest_algorithm: 0,  // unset
+        digest_algorithm: 0, // unset
         digest_size: config::MAX_DIGEST_SIZE as u16,
         digest: [0; config::MAX_DIGEST_SIZE],
     };
@@ -85,10 +92,11 @@ pub fn fsverity_measure(fd: impl AsRawFd) -> std::io::Result<(config::InnerHashA
 
     if ret < 0 {
         Err(std::io::Error::last_os_error())
-    }
-    else {
+    } else {
+        let algo = config::InnerHashAlgorithm::try_from(digest.digest_algorithm as u8)
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Unsupported, err))?;
         Ok((
-            config::InnerHashAlgorithm::try_from(digest.digest_algorithm as u8).unwrap(),
+            algo,
             Box::from(&digest.digest[..digest.digest_size as usize]),
         ))
     }
